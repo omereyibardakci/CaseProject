@@ -2,16 +2,17 @@ import { useQuery } from '@apollo/client';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
+import { APITestComponent } from '@/components/APITestComponent';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { RESERVATIONS_QUERY } from '@/services/graphql-service';
 import { reservationService } from '@/services/reservation-policy-service';
@@ -19,10 +20,11 @@ import { reservationService } from '@/services/reservation-policy-service';
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const [refreshing, setRefreshing] = useState(false);
+  const [showAPITest, setShowAPITest] = useState(false);
 
   // Mock user data - in a real app, this would come from authentication context
   const mockUser = {
-    id: 'user-123',
+    id: '550e8400-e29b-41d4-a716-446655440000', // Example UUID format
     email: 'student@example.com',
     name: 'John Doe',
     user_type: 'student' as const,
@@ -31,6 +33,8 @@ export default function ProfileScreen() {
   // GraphQL query for user reservations
   const { loading, error, data, refetch } = useQuery(RESERVATIONS_QUERY, {
     variables: { userId: mockUser.id },
+    errorPolicy: 'all', // Show partial results even if there are errors
+    notifyOnNetworkStatusChange: true,
   });
 
   const onRefresh = async () => {
@@ -45,9 +49,9 @@ export default function ProfileScreen() {
   };
 
   const reservations = data?.reservations || [];
-  const activeReservations = reservations.filter((r: any) => r.status === 'active');
-  const completedReservations = reservations.filter((r: any) => r.status === 'completed');
-  const cancelledReservations = reservations.filter((r: any) => r.status === 'cancelled');
+  const activeReservations = reservations.filter((r: any) => r?.status === 'active');
+  const completedReservations = reservations.filter((r: any) => r?.status === 'completed');
+  const cancelledReservations = reservations.filter((r: any) => r?.status === 'cancelled');
 
   const maxReservations = reservationService.getMaxReservations(mockUser.user_type);
   const reservationDuration = reservationService.getReservationDuration(mockUser.user_type);
@@ -110,8 +114,17 @@ export default function ProfileScreen() {
           Failed to load profile
         </Text>
         <Text style={styles.errorSubtext}>
-          {error.message}
+          {error.message.includes('variable') ? 
+            'Type mismatch error - please check the console for details' : 
+            error.message
+          }
         </Text>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={() => refetch()}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -347,6 +360,27 @@ export default function ProfileScreen() {
           Account Actions
         </Text>
         
+        {/* API Test Toggle */}
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            { 
+              borderColor: colorScheme === 'dark' ? '#3b82f6' : '#3b82f6',
+              marginBottom: 12
+            }
+          ]}
+          onPress={() => setShowAPITest(!showAPITest)}
+        >
+          <Ionicons 
+            name="flask-outline" 
+            size={20} 
+            color="#3b82f6" 
+          />
+          <Text style={[styles.actionButtonText, { color: '#3b82f6' }]}>
+            {showAPITest ? 'Hide API Test' : 'Show API Test'}
+          </Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity
           style={[
             styles.actionButton,
@@ -362,6 +396,22 @@ export default function ProfileScreen() {
           <Text style={styles.actionButtonText}>Logout</Text>
         </TouchableOpacity>
       </View>
+
+      {/* API Test Component */}
+      {showAPITest && (
+        <View style={[
+          styles.section,
+          { backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#ffffff' }
+        ]}>
+          <Text style={[
+            styles.sectionTitle,
+            { color: colorScheme === 'dark' ? '#f9fafb' : '#111827' }
+          ]}>
+            🧪 API Testing
+          </Text>
+          <APITestComponent />
+        </View>
+      )}
 
       <View style={styles.bottomSpacing} />
     </ScrollView>
@@ -524,5 +574,18 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 32,
+  },
+  retryButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

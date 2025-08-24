@@ -24,7 +24,7 @@ export function BookCard({ book }: BookCardProps) {
 
   // Mock user data - in a real app, this would come from authentication context
   const mockUser = {
-    id: 'user-123',
+            id: '550e8400-e29b-41d4-a716-446655440000',
     email: 'student@example.com',
     name: 'John Doe',
     user_type: 'student' as const,

@@ -22,7 +22,7 @@ export default function ReservationsScreen() {
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
   // Mock user ID - in a real app, this would come from authentication context
-  const mockUserId = 'user-123';
+  const mockUserId = '550e8400-e29b-41d4-a716-446655440000';
 
   // GraphQL query for user reservations
   const { loading, error, data, refetch } = useQuery(RESERVATIONS_QUERY, {
