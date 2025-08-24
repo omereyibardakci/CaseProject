@@ -12,21 +12,31 @@ import {
     View,
 } from 'react-native';
 
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { RESERVATIONS_QUERY } from '@/services/graphql-service';
 import { Reservation } from '@/types/graphql';
 
 export default function ReservationsScreen() {
   const colorScheme = useColorScheme();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
-  // Mock user ID - in a real app, this would come from authentication context
-  const mockUserId = '550e8400-e29b-41d4-a716-446655440000';
+  // Check if user is authenticated
+  if (!user) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+        <Text style={styles.errorText}>User not found</Text>
+        <Text style={styles.errorSubtext}>Please log in again</Text>
+      </View>
+    );
+  }
 
   // GraphQL query for user reservations
   const { loading, error, data, refetch } = useQuery(RESERVATIONS_QUERY, {
-    variables: { userId: mockUserId },
+    variables: { userId: user.id },
   });
 
   const onRefresh = async () => {
@@ -113,26 +123,6 @@ export default function ReservationsScreen() {
 
       <View style={styles.cardBody}>
         <View style={styles.dateRow}>
-          <View style={styles.dateItem}>
-            <Ionicons 
-              name="calendar-outline" 
-              size={16} 
-              color={colorScheme === 'dark' ? '#9ca3af' : '#6b7280'} 
-            />
-            <Text style={[
-              styles.dateLabel,
-              { color: colorScheme === 'dark' ? '#9ca3af' : '#6b7280' }
-            ]}>
-              Reserved:
-            </Text>
-            <Text style={[
-              styles.dateValue,
-              { color: colorScheme === 'dark' ? '#f9fafb' : '#111827' }
-            ]}>
-              {formatDate(item.reserved_at)}
-            </Text>
-          </View>
-          
           <View style={styles.dateItem}>
             <Ionicons 
               name="time-outline" 

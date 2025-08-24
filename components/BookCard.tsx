@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { graphQLService } from '@/services/graphql-service';
 import { reservationService } from '@/services/reservation-policy-service';
@@ -20,15 +21,13 @@ interface BookCardProps {
 
 export function BookCard({ book }: BookCardProps) {
   const colorScheme = useColorScheme();
+  const { user } = useAuth();
   const [reserving, setReserving] = useState(false);
 
-  // Mock user data - in a real app, this would come from authentication context
-  const mockUser = {
-            id: '550e8400-e29b-41d4-a716-446655440000',
-    email: 'student@example.com',
-    name: 'John Doe',
-    user_type: 'student' as const,
-  };
+  // Check if user is authenticated
+  if (!user) {
+    return null; // Don't render if not authenticated
+  }
 
   const handleReserve = async () => {
     if (book.available_copies === 0) {
@@ -40,12 +39,12 @@ export function BookCard({ book }: BookCardProps) {
       setReserving(true);
 
       // Get user's current reservations
-      const currentReservations = await graphQLService.getUserReservations(mockUser.id);
+      const currentReservations = await graphQLService.getUserReservations(user.id);
       const reservationCount = currentReservations.length;
 
       // Check if user can reserve based on policy
-      if (!reservationService.canUserReserve(mockUser, reservationCount)) {
-        const maxReservations = reservationService.getMaxReservations(mockUser.user_type);
+      if (!reservationService.canUserReserve(user, reservationCount)) {
+        const maxReservations = reservationService.getMaxReservations(user.user_type);
         Alert.alert(
           'Reservation Limit Reached',
           `You can only reserve up to ${maxReservations} books. Please return some books first.`
@@ -54,17 +53,17 @@ export function BookCard({ book }: BookCardProps) {
       }
 
       // Calculate expiration date
-      const expiresAt = reservationService.calculateExpirationDate(mockUser.user_type);
+      const expiresAt = reservationService.calculateExpirationDate(user.user_type);
 
       // Create reservation
-      await graphQLService.createReservation(mockUser.id, book.id, expiresAt);
+      await graphQLService.createReservation(user.id, book.id, expiresAt);
 
       // Update book availability
       await graphQLService.updateBookAvailability(book.id, book.available_copies - 1);
 
       Alert.alert(
         'Success!',
-        `"${book.title}" has been reserved successfully. It will expire in ${reservationService.getReservationDuration(mockUser.user_type)} days.`
+        `"${book.title}" has been reserved successfully. It will expire in ${reservationService.getReservationDuration(user.user_type)} days.`
       );
     } catch (error) {
       console.error('Reservation error:', error);

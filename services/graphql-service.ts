@@ -46,7 +46,6 @@ export const RESERVATIONS_QUERY = gql`
     reservations(where: { user_id: { _eq: $userId }, status: { _eq: "active" } }) {
       id
       book_id
-      reserved_at
       expires_at
       status
       book {
@@ -62,11 +61,10 @@ export const ALL_RESERVATIONS_QUERY = gql`
   query GetAllUserReservations($userId: uuid!) {
     reservations(
       where: { user_id: { _eq: $userId } }
-      order_by: { reserved_at: desc }
+      order_by: { expires_at: desc }
     ) {
       id
       book_id
-      reserved_at
       expires_at
       status
       book {
@@ -80,7 +78,7 @@ export const ALL_RESERVATIONS_QUERY = gql`
 `;
 
 export const CREATE_RESERVATION_MUTATION = gql`
-  mutation CreateReservation($userId: uuid!, $bookId: uuid!, $expiresAt: timestamptz!) {
+  mutation CreateReservation($userId: uuid!, $bookId: uuid!, $expiresAt: timestamp!) {
     insert_reservations_one(object: {
       user_id: $userId,
       book_id: $bookId,
@@ -89,9 +87,9 @@ export const CREATE_RESERVATION_MUTATION = gql`
       id
       user_id
       book_id
-      reserved_at
       expires_at
       status
+      created_at
     }
   }
 `;
@@ -117,7 +115,6 @@ export const CANCEL_RESERVATION_MUTATION = gql`
     ) {
       id
       status
-      updated_at
     }
   }
 `;
@@ -141,6 +138,33 @@ export const GET_RESERVATION_POLICIES_QUERY = gql`
       user_type
       max_reservations
       reservation_duration_days
+    }
+  }
+`;
+
+// Simple test mutation to verify table structure
+export const TEST_RESERVATION_MUTATION = gql`
+  mutation TestReservation($userId: uuid!, $bookId: uuid!, $expiresAt: timestamp!) {
+    insert_reservations_one(object: {
+      user_id: $userId,
+      book_id: $bookId,
+      expires_at: $expiresAt
+    }) {
+      id
+    }
+  }
+`;
+
+// Query to check if reservations table exists and get its structure
+export const CHECK_RESERVATIONS_TABLE_QUERY = gql`
+  query CheckReservationsTable {
+    reservations(limit: 1) {
+      id
+      user_id
+      book_id
+      expires_at
+      status
+      created_at
     }
   }
 `;
@@ -270,7 +294,9 @@ export class GraphQLService {
    */
   async createReservation(userId: string, bookId: string, expiresAt: string) {
     try {
-      const { data } = await apolloClient.mutate({
+      console.log('Creating reservation with variables:', { userId, bookId, expiresAt });
+      
+      const { data, errors } = await apolloClient.mutate({
         mutation: CREATE_RESERVATION_MUTATION,
         variables: { userId, bookId, expiresAt },
         refetchQueries: [
@@ -278,10 +304,44 @@ export class GraphQLService {
           { query: BOOKS_QUERY },
         ],
       });
-      return data.insert_reservations_one;
+      
+      console.log('Full mutation response:', { data, errors });
+      
+      // Check for GraphQL errors first
+      if (errors && errors.length > 0) {
+        console.error('GraphQL errors:', errors);
+        throw new Error(`GraphQL errors: ${errors.map(e => e.message).join(', ')}`);
+      }
+      
+      // Check if we have any data at all
+      if (!data) {
+        console.error('No data returned from mutation');
+        throw new Error('No data returned from mutation');
+      }
+      
+      // Log the entire data structure for debugging
+      console.log('Mutation response data:', JSON.stringify(data, null, 2));
+      
+      // Check for the specific field we expect
+      if (!data.insert_reservations_one) {
+        console.error('No reservation data returned from mutation');
+        console.error('Available data keys:', Object.keys(data));
+        throw new Error('No reservation data returned from mutation');
+      }
+      
+      const reservation = data.insert_reservations_one;
+      console.log('Successfully created reservation:', reservation);
+      
+      return reservation;
     } catch (error) {
       console.error('Error creating reservation:', error);
-      throw new Error('Failed to create reservation');
+      
+      // Provide more specific error information
+      if (error instanceof Error) {
+        throw new Error(`Failed to create reservation: ${error.message}`);
+      } else {
+        throw new Error(`Failed to create reservation: ${String(error)}`);
+      }
     }
   }
 
@@ -334,6 +394,74 @@ export class GraphQLService {
     } catch (error) {
       console.error('Error refreshing cache:', error);
       throw new Error('Failed to refresh cache');
+    }
+  }
+
+  /**
+   * Test method to verify reservation table structure and permissions
+   * @param userId - The user's unique identifier
+   * @param bookId - The book's unique identifier
+   * @param expiresAt - When the reservation expires
+   * @returns Promise with test result
+   */
+  async testReservation(userId: string, bookId: string, expiresAt: string) {
+    try {
+      console.log('Testing reservation creation with minimal fields...');
+      
+      const { data, errors } = await apolloClient.mutate({
+        mutation: TEST_RESERVATION_MUTATION,
+        variables: { userId, bookId, expiresAt },
+      });
+      
+      console.log('Test mutation response:', { data, errors });
+      
+      if (errors && errors.length > 0) {
+        return { success: false, errors: errors.map(e => e.message) };
+      }
+      
+      if (data?.insert_reservations_one?.id) {
+        return { success: true, id: data.insert_reservations_one.id };
+      }
+      
+      return { success: false, message: 'No ID returned from test mutation' };
+    } catch (error) {
+      console.error('Test reservation error:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Check if the reservations table exists and get its structure
+   * @returns Promise with table check result
+   */
+  async checkReservationsTable() {
+    try {
+      console.log('Checking reservations table structure...');
+      
+      const { data, errors } = await apolloClient.query({
+        query: CHECK_RESERVATIONS_TABLE_QUERY,
+        fetchPolicy: 'no-cache', // Don't use cache for this check
+      });
+      
+      console.log('Table check response:', { data, errors });
+      
+      if (errors && errors.length > 0) {
+        return { success: false, errors: errors.map(e => e.message) };
+      }
+      
+      if (data?.reservations) {
+        return { 
+          success: true, 
+          tableExists: true,
+          sampleData: data.reservations[0] || null,
+          totalCount: data.reservations.length
+        };
+      }
+      
+      return { success: false, tableExists: false };
+    } catch (error) {
+      console.error('Table check error:', error);
+      return { success: false, error: String(error) };
     }
   }
 }

@@ -2,8 +2,8 @@ import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/link-context';
 
 // Configuration constants - following clean code principles
-const HASURA_GRAPHQL_ENDPOINT = process.env.EXPO_PUBLIC_HASURA_GRAPHQL_API_URL || 'https://case-project.hasura.app/v1/graphql';
-const HASURA_ADMIN_SECRET = process.env.HASURA_GRAPHQL_ADMIN_SECRET || 'yIw1RBHtIFpGxv6GHg9k7nSr2DAtAu58Rjp8W6jFFSsRU1tuVFZlnrJScbfCmi7Z';
+const HASURA_GRAPHQL_ENDPOINT = process.env.EXPO_PUBLIC_HASURA_GRAPHQL_ENDPOINT || 'https://case-project.hasura.app/v1/graphql';
+const HASURA_ADMIN_SECRET = process.env.EXPO_PUBLIC_HASURA_GRAPHQL_ADMIN_SECRET || 'yIw1RBHtIFpGxv6GHg9k7nSr2DAtAu58Rjp8W6jFFSsRU1tuVFZlnrJScbfCmi7Z';
 
 
 // HTTP link for GraphQL operations

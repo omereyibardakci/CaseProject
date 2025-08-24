@@ -13,7 +13,6 @@ export interface Reservation {
   id: string;
   user_id: string;
   book_id: string;
-  reserved_at: string;
   expires_at: string;
   status: 'active' | 'completed' | 'cancelled';
   book?: Book;
