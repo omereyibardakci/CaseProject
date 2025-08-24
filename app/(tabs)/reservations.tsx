@@ -1,0 +1,454 @@
+import { useQuery } from '@apollo/client';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { RESERVATIONS_QUERY } from '@/services/graphql-service';
+import { Reservation } from '@/types/graphql';
+
+export default function ReservationsScreen() {
+  const colorScheme = useColorScheme();
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
+
+  // Mock user ID - in a real app, this would come from authentication context
+  const mockUserId = 'user-123';
+
+  // GraphQL query for user reservations
+  const { loading, error, data, refetch } = useQuery(RESERVATIONS_QUERY, {
+    variables: { userId: mockUserId },
+  });
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (err) {
+      console.error('Error refreshing reservations:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const reservations = data?.reservations || [];
+
+  const filteredReservations = selectedStatus === 'all' 
+    ? reservations 
+    : reservations.filter((reservation: any) => reservation.status === selectedStatus);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return '#10b981';
+      case 'completed': return '#6b7280';
+      case 'cancelled': return '#ef4444';
+      default: return '#6b7280';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active': return 'time-outline';
+      case 'completed': return 'checkmark-circle-outline';
+      case 'cancelled': return 'close-circle-outline';
+      default: return 'help-circle-outline';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const renderReservationItem = ({ item }: { item: Reservation }) => (
+    <View style={[
+      styles.reservationCard,
+      { 
+        backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#ffffff',
+        borderColor: colorScheme === 'dark' ? '#374151' : '#e5e7eb',
+      }
+    ]}>
+      <View style={styles.cardHeader}>
+        <View style={styles.bookInfo}>
+          <Text style={[
+            styles.bookTitle,
+            { color: colorScheme === 'dark' ? '#f9fafb' : '#111827' }
+          ]}>
+            {item.book?.title || 'Unknown Book'}
+          </Text>
+          <Text style={[
+            styles.bookAuthor,
+            { color: colorScheme === 'dark' ? '#9ca3af' : '#6b7280' }
+          ]}>
+            by {item.book?.author || 'Unknown Author'}
+          </Text>
+        </View>
+        <View style={styles.statusContainer}>
+          <Ionicons 
+            name={getStatusIcon(item.status) as any} 
+            size={20} 
+            color={getStatusColor(item.status)} 
+          />
+          <Text style={[
+            styles.statusText,
+            { color: getStatusColor(item.status) }
+          ]}>
+            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.cardBody}>
+        <View style={styles.dateRow}>
+          <View style={styles.dateItem}>
+            <Ionicons 
+              name="calendar-outline" 
+              size={16} 
+              color={colorScheme === 'dark' ? '#9ca3af' : '#6b7280'} 
+            />
+            <Text style={[
+              styles.dateLabel,
+              { color: colorScheme === 'dark' ? '#9ca3af' : '#6b7280' }
+            ]}>
+              Reserved:
+            </Text>
+            <Text style={[
+              styles.dateValue,
+              { color: colorScheme === 'dark' ? '#f9fafb' : '#111827' }
+            ]}>
+              {formatDate(item.reserved_at)}
+            </Text>
+          </View>
+          
+          <View style={styles.dateItem}>
+            <Ionicons 
+              name="time-outline" 
+              size={16} 
+              color={colorScheme === 'dark' ? '#9ca3af' : '#6b7280'} 
+            />
+            <Text style={[
+              styles.dateLabel,
+              { color: colorScheme === 'dark' ? '#9ca3af' : '#6b7280' }
+            ]}>
+              Expires:
+            </Text>
+            <Text style={[
+              styles.dateValue,
+              { color: getStatusColor(item.status) }
+            ]}>
+              {formatDate(item.expires_at)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {item.status === 'active' && (
+        <View style={styles.cardFooter}>
+          <TouchableOpacity
+            style={[
+              styles.cancelButton,
+              { borderColor: colorScheme === 'dark' ? '#ef4444' : '#ef4444' }
+            ]}
+            onPress={() => handleCancelReservation(item.id)}
+          >
+            <Text style={styles.cancelButtonText}>Cancel Reservation</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons 
+        name="bookmark-outline" 
+        size={64} 
+        color={colorScheme === 'dark' ? '#6b7280' : '#9ca3af'} 
+      />
+      <Text style={[
+        styles.emptyStateText,
+        { color: colorScheme === 'dark' ? '#6b7280' : '#9ca3af' }
+      ]}>
+        No reservations found
+      </Text>
+      <Text style={[
+        styles.emptyStateSubtext,
+        { color: colorScheme === 'dark' ? '#6b7280' : '#9ca3af' }
+      ]}>
+        {selectedStatus === 'all' 
+          ? 'You haven\'t made any reservations yet.' 
+          : `No ${selectedStatus} reservations found.`
+        }
+      </Text>
+    </View>
+  );
+
+  const handleCancelReservation = (reservationId: string) => {
+    Alert.alert(
+      'Cancel Reservation',
+      'Are you sure you want to cancel this reservation?',
+      [
+        { text: 'No', style: 'cancel' },
+        { 
+          text: 'Yes, Cancel', 
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Implement cancel reservation mutation
+            Alert.alert('Success', 'Reservation cancelled successfully.');
+          }
+        },
+      ]
+    );
+  };
+
+  if (loading && !data) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={[
+          styles.loadingText,
+          { color: colorScheme === 'dark' ? '#6b7280' : '#9ca3af' }
+        ]}>
+          Loading reservations...
+        </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons 
+          name="alert-circle-outline" 
+          size={64} 
+          color="#ef4444" 
+        />
+        <Text style={styles.errorText}>
+          Failed to load reservations
+        </Text>
+        <Text style={styles.errorSubtext}>
+          {error.message}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[
+      styles.container,
+      { backgroundColor: colorScheme === 'dark' ? '#111827' : '#f9fafb' }
+    ]}>
+      {/* Status Filter Tabs */}
+      <View style={styles.filterContainer}>
+        {(['all', 'active', 'completed', 'cancelled'] as const).map((status) => (
+          <TouchableOpacity
+            key={status}
+            style={[
+              styles.filterTab,
+              selectedStatus === status && {
+                backgroundColor: '#3b82f6',
+                borderColor: '#3b82f6',
+              }
+            ]}
+            onPress={() => setSelectedStatus(status)}
+          >
+            <Text style={[
+              styles.filterTabText,
+              selectedStatus === status && { color: '#ffffff' }
+            ]}>
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <FlatList
+        data={filteredReservations}
+        renderItem={renderReservationItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3b82f6']}
+            tintColor={colorScheme === 'dark' ? '#6b7280' : '#9ca3af'}
+          />
+        }
+        ListEmptyComponent={renderEmptyState}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+  },
+  filterTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  listContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    padding: 32,
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ef4444',
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 64,
+  },
+  emptyStateText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  emptyStateSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  reservationCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  bookInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  bookTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    lineHeight: 22,
+  },
+  bookAuthor: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  cardBody: {
+    marginBottom: 16,
+  },
+  dateRow: {
+    gap: 12,
+  },
+  dateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    minWidth: 60,
+  },
+  dateValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 16,
+    alignItems: 'flex-end',
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+});

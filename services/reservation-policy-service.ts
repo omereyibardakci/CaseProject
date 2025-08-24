@@ -41,10 +41,12 @@ export class NormalUserReservationPolicy extends ReservationPolicyBase {
 export class ReservationPolicyFactory {
   private static policies: Map<string, ReservationPolicyBase> = new Map();
 
-  static {
-    // Initialize default policies
-    ReservationPolicyFactory.policies.set('student', new StudentReservationPolicy());
-    ReservationPolicyFactory.policies.set('normal', new NormalUserReservationPolicy());
+  // Initialize policies in a static method instead of static block
+  private static initializePolicies(): void {
+    if (this.policies.size === 0) {
+      this.policies.set('student', new StudentReservationPolicy());
+      this.policies.set('normal', new NormalUserReservationPolicy());
+    }
   }
 
   /**
@@ -53,6 +55,7 @@ export class ReservationPolicyFactory {
    * @returns The reservation policy for that user type
    */
   static getPolicy(userType: string): ReservationPolicyBase {
+    this.initializePolicies();
     const policy = this.policies.get(userType);
     if (!policy) {
       throw new Error(`No policy found for user type: ${userType}`);

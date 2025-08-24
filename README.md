@@ -1,50 +1,150 @@
-# Welcome to your Expo app 👋
+# 📚 Library Reservation System
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A modern, clean React Native (Expo) application for managing library book reservations with Hasura GraphQL backend.
 
-## Get started
+## ✨ Features
 
-1. Install dependencies
+- **📖 Book Catalog**: Browse and search available books
+- **🔖 Smart Reservations**: Role-based reservation limits (Students: 5 books, Normal users: 3 books)
+- **📱 Modern UI**: Clean, responsive design with dark/light theme support
+- **🔄 Real-time Updates**: GraphQL-powered data synchronization
+- **⚡ Policy Engine**: Extensible reservation rules system
 
-   ```bash
-   npm install
-   ```
+## 🏗️ Architecture
 
-2. Start the app
+### **Clean Architecture Principles**
+- **Presentation Layer**: React Native components and screens
+- **Service Layer**: Business logic and GraphQL operations
+- **Policy Layer**: Extensible reservation rules (Open/Closed Principle)
+- **Data Layer**: Apollo Client and GraphQL integration
 
-   ```bash
-   npx expo start
-   ```
+### **SOLID Design Patterns**
+- ✅ **Single Responsibility**: Each component has one clear purpose
+- ✅ **Open/Closed**: Easy to extend with new user types and policies
+- ✅ **Liskov Substitution**: Consistent interfaces across implementations
+- ✅ **Interface Segregation**: Focused, clean service interfaces
+- ✅ **Dependency Inversion**: High-level modules depend on abstractions
 
-In the output, you'll find options to open the app in a
+## 🚀 Getting Started
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Prerequisites
+- Node.js 18+ 
+- Expo CLI
+- Hasura GraphQL instance
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### Installation
 ```bash
-npm run reset-project
+# Clone the repository
+git clone <repository-url>
+cd CaseProject
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Environment Setup
+1. **Hasura Configuration**: Update `lib/apollo-client.ts` with your GraphQL endpoint
+2. **Database Schema**: Ensure your Hasura instance has the required tables (books, users, reservations)
+3. **Authentication**: Configure user authentication (currently using mock data)
 
-## Learn more
+## 📱 App Structure
 
-To learn more about developing your project with Expo, look at the following resources:
+### **Screens**
+- **Books Tab**: Browse available books and make reservations
+- **Reservations Tab**: View and manage your reservations
+- **Profile Tab**: User information and reservation statistics
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### **Components**
+- `BookCard`: Individual book display with reservation functionality
+- `ReservationCard`: Reservation status and management
+- Navigation: Tab-based navigation with Expo Router
 
-## Join the community
+### **Services**
+- `GraphQLService`: Handles all GraphQL operations
+- `ReservationService`: Manages reservation business logic
+- `ReservationPolicyService`: Enforces user role-based rules
 
-Join our community of developers creating universal apps.
+## 🔧 Configuration
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### **GraphQL Endpoint**
+Update the Hasura endpoint in `lib/apollo-client.ts`:
+```typescript
+const HASURA_GRAPHQL_ENDPOINT = 'https://your-hasura-instance.hasura.app/v1/graphql';
+```
+
+### **Reservation Policies**
+Modify reservation rules in `services/reservation-policy-service.ts`:
+```typescript
+// Students: 5 books for 14 days
+// Normal users: 3 books for 7 days
+```
+
+## 📊 Database Schema
+
+### **Required Tables**
+```sql
+-- Users table
+users (id, email, name, user_type, created_at, updated_at)
+
+-- Books table  
+books (id, title, author, isbn, available, total_copies, available_copies)
+
+-- Reservations table
+reservations (id, user_id, book_id, reserved_at, expires_at, status)
+```
+
+## 🎨 UI/UX Features
+
+- **Responsive Design**: Works on all screen sizes
+- **Theme Support**: Automatic dark/light mode switching
+- **Loading States**: Smooth loading and error handling
+- **Pull-to-Refresh**: Easy data refresh
+- **Status Indicators**: Clear visual feedback for availability
+
+## 🧪 Testing
+
+```bash
+# Run TypeScript compilation check
+npx tsc --noEmit
+
+# Run linting
+npm run lint
+
+# Start development server
+npm start
+```
+
+## 🔮 Future Enhancements
+
+- [ ] User authentication and authorization
+- [ ] Push notifications for reservation reminders
+- [ ] Book search and filtering
+- [ ] Reservation history and analytics
+- [ ] Admin panel for librarians
+- [ ] Offline support with local caching
+
+## 📝 Code Quality
+
+- **TypeScript**: Full type safety throughout the application
+- **ESLint**: Code quality and consistency enforcement
+- **Clean Code**: Meaningful naming, no magic numbers
+- **Documentation**: Comprehensive JSDoc comments
+
+## 🤝 Contributing
+
+1. Follow the established architecture patterns
+2. Maintain SOLID principles
+3. Add proper TypeScript types
+4. Include error handling
+5. Test thoroughly before submitting
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+**Built with ❤️ using React Native, Expo, and Hasura GraphQL**
