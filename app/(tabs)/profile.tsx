@@ -13,26 +13,31 @@ import {
 } from 'react-native';
 
 import { APITestComponent } from '@/components/APITestComponent';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { RESERVATIONS_QUERY } from '@/services/graphql-service';
 import { reservationService } from '@/services/reservation-policy-service';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
+  const { user, logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [showAPITest, setShowAPITest] = useState(false);
 
-  // Mock user data - in a real app, this would come from authentication context
-  const mockUser = {
-    id: '550e8400-e29b-41d4-a716-446655440000', // Example UUID format
-    email: 'student@example.com',
-    name: 'John Doe',
-    user_type: 'student' as const,
-  };
+  // Use real user data from authentication context
+  if (!user) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={64} color="#ef4444" />
+        <Text style={styles.errorText}>User not found</Text>
+        <Text style={styles.errorSubtext}>Please log in again</Text>
+      </View>
+    );
+  }
 
   // GraphQL query for user reservations
   const { loading, error, data, refetch } = useQuery(RESERVATIONS_QUERY, {
-    variables: { userId: mockUser.id },
+    variables: { userId: user.id },
     errorPolicy: 'all', // Show partial results even if there are errors
     notifyOnNetworkStatusChange: true,
   });
@@ -53,19 +58,19 @@ export default function ProfileScreen() {
   const completedReservations = reservations.filter((r: any) => r?.status === 'completed');
   const cancelledReservations = reservations.filter((r: any) => r?.status === 'cancelled');
 
-  const maxReservations = reservationService.getMaxReservations(mockUser.user_type);
-  const reservationDuration = reservationService.getReservationDuration(mockUser.user_type);
+  const maxReservations = reservationService.getMaxReservations(user.user_type);
+  const reservationDuration = reservationService.getReservationDuration(user.user_type);
 
   const getRoleIcon = () => {
-    return mockUser.user_type === 'student' ? 'school-outline' : 'person-outline';
+    return user.user_type === 'student' ? 'school-outline' : 'person-outline';
   };
 
   const getRoleColor = () => {
-    return mockUser.user_type === 'student' ? '#3b82f6' : '#10b981';
+    return user.user_type === 'student' ? '#3b82f6' : '#10b981';
   };
 
   const getRoleDescription = () => {
-    return mockUser.user_type === 'student' 
+    return user.user_type === 'student' 
       ? 'Student members can reserve up to 5 books for 14 days'
       : 'Regular members can reserve up to 3 books for 7 days';
   };
@@ -79,9 +84,13 @@ export default function ProfileScreen() {
         { 
           text: 'Logout', 
           style: 'destructive',
-          onPress: () => {
-            // TODO: Implement logout logic
-            Alert.alert('Success', 'Logged out successfully.');
+          onPress: async () => {
+            try {
+              await logout();
+              Alert.alert('Success', 'Logged out successfully.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
           }
         },
       ]
@@ -155,7 +164,7 @@ export default function ProfileScreen() {
             { backgroundColor: getRoleColor() }
           ]}>
             <Text style={styles.avatarText}>
-              {mockUser.name.charAt(0).toUpperCase()}
+              {user.name.charAt(0).toUpperCase()}
             </Text>
           </View>
         </View>
@@ -165,13 +174,13 @@ export default function ProfileScreen() {
             styles.userName,
             { color: colorScheme === 'dark' ? '#f9fafb' : '#111827' }
           ]}>
-            {mockUser.name}
+            {user.name}
           </Text>
           <Text style={[
             styles.userEmail,
             { color: colorScheme === 'dark' ? '#9ca3af' : '#6b7280' }
           ]}>
-            {mockUser.email}
+            {user.email}
           </Text>
         </View>
 
@@ -185,8 +194,8 @@ export default function ProfileScreen() {
             styles.roleText,
             { color: getRoleColor() }
           ]}>
-            {mockUser.user_type.charAt(0).toUpperCase() + mockUser.user_type.slice(1)}
-          </Text>
+            {user.user_type.charAt(0).toUpperCase() + user.user_type.slice(1)}
+        </Text>
         </View>
       </View>
 
