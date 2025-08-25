@@ -1,7 +1,61 @@
 import { apolloClient } from '@/lib/apollo-client';
 import { gql } from '@apollo/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { v4 as uuidv4 } from 'uuid';
+
+// React Native compatible UUID generator
+function generateUUID(): string {
+  try {
+    // Simple UUID v4 generator that works in React Native
+    const hexDigits = '0123456789abcdef';
+    let uuid = '';
+    
+    for (let i = 0; i < 36; i++) {
+      if (i === 8 || i === 13 || i === 18 || i === 23) {
+        uuid += '-';
+      } else if (i === 14) {
+        uuid += '4'; // Version 4
+      } else if (i === 19) {
+        uuid += hexDigits[(Math.random() * 4) | 8]; // Variant bits
+      } else {
+        uuid += hexDigits[(Math.random() * 16) | 0];
+      }
+    }
+    
+    // Validate the generated UUID
+    if (uuid.length !== 36) {
+      throw new Error(`Invalid UUID length: ${uuid.length}`);
+    }
+    
+    return uuid;
+  } catch (error) {
+    console.error('Error generating UUID:', error);
+    
+    // Fallback: generate a simple unique ID using timestamp and random numbers
+    const timestamp = Date.now().toString(16);
+    const random = Math.random().toString(16).substring(2, 10);
+    const fallbackId = `${timestamp}-${random}-4000-8000-${random}${timestamp}`;
+    
+    console.log('Using fallback ID generation:', fallbackId);
+    return fallbackId;
+  }
+}
+
+// Test function to verify UUID generation
+function testUUIDGeneration(): void {
+  console.log('Testing UUID generation...');
+  for (let i = 0; i < 5; i++) {
+    const uuid = generateUUID();
+    console.log(`Generated UUID ${i + 1}:`, uuid);
+    
+    // Basic validation
+    if (uuid.length !== 36) {
+      console.error('Invalid UUID length:', uuid.length);
+    }
+    if (!uuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+      console.error('Invalid UUID format:', uuid);
+    }
+  }
+}
 
 // GraphQL mutations and queries
 export const CREATE_USER_MUTATION = gql`
@@ -67,6 +121,8 @@ export class AuthService {
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
       AuthService.instance = new AuthService();
+      // Test UUID generation on first initialization
+      testUUIDGeneration();
     }
     return AuthService.instance;
   }
@@ -86,6 +142,8 @@ export class AuthService {
     userType: 'student' | 'normal'
   ): Promise<AuthResponse> {
     try {
+      console.log('Starting user registration:', { email, name, userType });
+      
       // Validate input parameters
       if (!this.validateEmail(email)) {
         return { success: false, error: 'Invalid email format' };
@@ -100,9 +158,11 @@ export class AuthService {
       }
 
       // Generate unique UUID for user
-      const userId = uuidv4();
+      const userId = generateUUID();
+      console.log('Generated UUID for user:', userId);
 
       // Create user via GraphQL mutation
+      console.log('Creating user with GraphQL mutation...');
       const { data } = await apolloClient.mutate({
         mutation: CREATE_USER_MUTATION,
         variables: {
@@ -114,13 +174,18 @@ export class AuthService {
         },
       });
 
+      console.log('GraphQL mutation response:', data);
       const newUser = data.insert_users_one;
       
       if (!newUser) {
+        console.error('No user data returned from mutation');
         return { success: false, error: 'Failed to create user' };
       }
 
+      console.log('User created successfully:', newUser);
+
       // Automatically log in the user after successful registration
+      console.log('Auto-login after registration...');
       return await this.loginUser(email, password);
     } catch (error) {
       console.error('Registration error:', error);
