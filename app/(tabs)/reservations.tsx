@@ -14,7 +14,7 @@ import {
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { RESERVATIONS_QUERY } from '@/services/graphql-service';
+import { RESERVATIONS_QUERY, graphQLService } from '@/services/graphql-service';
 import { Reservation } from '@/types/graphql';
 
 export default function ReservationsScreen() {
@@ -22,6 +22,7 @@ export default function ReservationsScreen() {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
+  const [cancellingReservation, setCancellingReservation] = useState<string | null>(null);
 
   // Check if user is authenticated
   if (!user) {
@@ -83,6 +84,23 @@ export default function ReservationsScreen() {
     });
   };
 
+  const getDaysRemaining = (dateString: string) => {
+    const now = new Date();
+    const expiryDate = new Date(dateString);
+    const diffTime = expiryDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return 'Expired';
+    } else if (diffDays === 0) {
+      return 'Expires today';
+    } else if (diffDays === 1) {
+      return 'Expires tomorrow';
+    } else {
+      return `${diffDays} days left`;
+    }
+  };
+
   const renderReservationItem = ({ item }: { item: Reservation }) => (
     <View style={[
       styles.reservationCard,
@@ -142,6 +160,25 @@ export default function ReservationsScreen() {
               {formatDate(item.expires_at)}
             </Text>
           </View>
+          <View style={styles.dateItem}>
+            <Ionicons 
+              name="calendar-outline" 
+              size={16} 
+              color={colorScheme === 'dark' ? '#9ca3af' : '#6b7280'} 
+            />
+            <Text style={[
+              styles.dateLabel,
+              { color: colorScheme === 'dark' ? '#9ca3af' : '#6b7280' }
+            ]}>
+              Time Left:
+            </Text>
+            <Text style={[
+              styles.dateValue,
+              { color: getStatusColor(item.status) }
+            ]}>
+              {getDaysRemaining(item.expires_at)}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -150,11 +187,22 @@ export default function ReservationsScreen() {
           <TouchableOpacity
             style={[
               styles.cancelButton,
-              { borderColor: colorScheme === 'dark' ? '#ef4444' : '#ef4444' }
+              { 
+                borderColor: colorScheme === 'dark' ? '#ef4444' : '#ef4444',
+                opacity: cancellingReservation === item.id ? 0.6 : 1
+              }
             ]}
             onPress={() => handleCancelReservation(item.id)}
+            disabled={cancellingReservation === item.id}
           >
-            <Text style={styles.cancelButtonText}>Cancel Reservation</Text>
+            {cancellingReservation === item.id ? (
+              <View style={styles.cancelButtonLoading}>
+                <ActivityIndicator size="small" color="#ef4444" />
+                <Text style={styles.cancelButtonText}>Cancelling...</Text>
+              </View>
+            ) : (
+              <Text style={styles.cancelButtonText}>Cancel Reservation</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -186,18 +234,51 @@ export default function ReservationsScreen() {
     </View>
   );
 
-  const handleCancelReservation = (reservationId: string) => {
+  const handleCancelReservation = async (reservationId: string) => {
+    // Find the reservation to get book details
+    const reservation = reservations.find((r: any) => r.id === reservationId);
+    
+    if (!reservation) {
+      Alert.alert('Error', 'Reservation not found.');
+      return;
+    }
+    
+    if (reservation.status !== 'active') {
+      Alert.alert('Cannot Cancel', `This reservation is already ${reservation.status}.`);
+      return;
+    }
+    
+    const bookTitle = reservation?.book?.title || 'this book';
+    
     Alert.alert(
       'Cancel Reservation',
-      'Are you sure you want to cancel this reservation?',
+      `Are you sure you want to cancel your reservation for "${bookTitle}"?`,
       [
         { text: 'No', style: 'cancel' },
         { 
           text: 'Yes, Cancel', 
           style: 'destructive',
-          onPress: () => {
-            // TODO: Implement cancel reservation mutation
-            Alert.alert('Success', 'Reservation cancelled successfully.');
+          onPress: async () => {
+            try {
+              setCancellingReservation(reservationId);
+              
+              // Call the GraphQL service to cancel the reservation
+              await graphQLService.cancelReservation(reservationId);
+              
+              // Show success message
+              Alert.alert('Success', `Reservation for "${bookTitle}" has been cancelled successfully.`);
+              
+              // Refresh the reservations list
+              await refetch();
+            } catch (error) {
+              console.error('Error cancelling reservation:', error);
+              Alert.alert(
+                'Error', 
+                error instanceof Error ? error.message : 'Failed to cancel reservation. Please try again.'
+              );
+            } finally {
+              setCancellingReservation(null);
+            }
           }
         },
       ]
@@ -409,6 +490,8 @@ const styles = StyleSheet.create({
   },
   dateRow: {
     gap: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   dateItem: {
     flexDirection: 'row',
@@ -440,5 +523,10 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 12,
     fontWeight: '600',
+  },
+  cancelButtonLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

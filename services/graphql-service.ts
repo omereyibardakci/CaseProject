@@ -115,6 +115,7 @@ export const CANCEL_RESERVATION_MUTATION = gql`
     ) {
       id
       status
+      book_id
     }
   }
 `;
@@ -372,11 +373,78 @@ export class GraphQLService {
    */
   async cancelReservation(reservationId: string) {
     try {
+      console.log('Cancelling reservation:', reservationId);
+      
+      // First, get the current reservation to find the book_id
+      const { data: reservationData } = await apolloClient.query({
+        query: gql`
+          query GetReservation($id: uuid!) {
+            reservations_by_pk(id: $id) {
+              id
+              book_id
+              status
+            }
+          }
+        `,
+        variables: { id: reservationId },
+        fetchPolicy: 'no-cache',
+      });
+      
+      const reservation = reservationData.reservations_by_pk;
+      if (!reservation) {
+        throw new Error('Reservation not found');
+      }
+      
+      if (reservation.status === 'cancelled') {
+        throw new Error('Reservation is already cancelled');
+      }
+      
+      console.log('Found reservation:', reservation);
+      
+      // Cancel the reservation
       const { data } = await apolloClient.mutate({
         mutation: CANCEL_RESERVATION_MUTATION,
         variables: { reservationId },
-        refetchQueries: [{ query: BOOKS_QUERY }],
+        refetchQueries: [
+          { query: RESERVATIONS_QUERY, variables: { userId: reservation.user_id } },
+          { query: BOOKS_QUERY }
+        ],
       });
+      
+      console.log('Reservation cancelled successfully:', data);
+      
+      // Update book availability to increase available copies
+      try {
+        const { data: bookData } = await apolloClient.query({
+          query: gql`
+            query GetBook($id: uuid!) {
+              books_by_pk(id: $id) {
+                id
+                available_copies
+                total_copies
+              }
+            }
+          `,
+          variables: { id: reservation.book_id },
+          fetchPolicy: 'no-cache',
+        });
+        
+        const book = bookData.books_by_pk;
+        if (book) {
+          const newAvailableCopies = Math.min(book.available_copies + 1, book.total_copies);
+          
+          await this.updateBookAvailability(reservation.book_id, newAvailableCopies);
+          console.log('Book availability updated:', { 
+            bookId: reservation.book_id, 
+            oldAvailable: book.available_copies, 
+            newAvailable: newAvailableCopies 
+          });
+        }
+      } catch (bookUpdateError) {
+        console.error('Error updating book availability:', bookUpdateError);
+        // Don't fail the cancellation if book update fails
+      }
+      
       return data.update_reservations_by_pk;
     } catch (error) {
       console.error('Error cancelling reservation:', error);
